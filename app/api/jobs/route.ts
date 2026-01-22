@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAllJobs, addJob, updateJob, deleteJob } from '@/lib/data/jobs-store';
+import { getAllJobs, addJob, updateJob, deleteJob, clearAllJobs } from '@/lib/data/jobs-store';
 import { Job } from '@/lib/data/types';
 
 export async function GET() {
@@ -49,5 +49,21 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to delete job' }, { status: 500 });
+  }
+}
+
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { jobs } = body;
+    
+    if (jobs && jobs.length === 0) {
+      await clearAllJobs();
+      return NextResponse.json({ success: true });
+    }
+    
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to clear jobs' }, { status: 500 });
   }
 }

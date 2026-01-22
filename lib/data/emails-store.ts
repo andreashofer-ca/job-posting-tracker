@@ -62,3 +62,7 @@ export async function updateLastFetch(): Promise<void> {
   data.lastFetch = new Date().toISOString();
   await saveEmails(data);
 }
+
+export async function clearAllEmails(): Promise<void> {
+  await saveEmails({ emails: [], lastFetch: null });
+}

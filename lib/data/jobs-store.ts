@@ -75,3 +75,9 @@ export async function updateLastSync(): Promise<void> {
   data.lastSync = new Date().toISOString();
   await writeJobsFile(data);
 }
+
+export async function clearAllJobs(): Promise<void> {
+  const data = await readJobsFile();
+  data.jobs = [];
+  await writeJobsFile(data);
+}

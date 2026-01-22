@@ -183,15 +183,26 @@ export default function Home() {
 
             </div>
             <Button 
-              onClick={() => {
-                if (confirm('Are you sure you want to clear all jobs? This cannot be undone.')) {
+              onClick={async () => {
+                if (confirm('Are you sure you want to clear all jobs and emails? This cannot be undone.')) {
                   setJobs([]);
-                  // Write empty jobs array to file
-                  fetch('/api/jobs', { 
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ jobs: [] })
-                  }).catch(err => console.error('Error clearing jobs:', err));
+                  // Clear both jobs and emails
+                  try {
+                    await Promise.all([
+                      fetch('/api/jobs', { 
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ jobs: [] })
+                      }),
+                      fetch('/api/emails', { 
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ emails: [] })
+                      })
+                    ]);
+                  } catch (err) {
+                    console.error('Error clearing data:', err);
+                  }
                 }
               }}
             >
@@ -206,11 +217,6 @@ export default function Home() {
           <JobTable jobs={jobs} onUpdate={handleUpdate} onDelete={handleDelete} />
         )}
       </div>
-
-      <footer className="text-center text-sm text-muted-foreground pt-8">
-        <p>Note: This is a development version using mock Gmail data.</p>
-        <p>Configure Gmail MCP server to connect your actual Gmail account.</p>
-      </footer>
     </div>
   );
 }
