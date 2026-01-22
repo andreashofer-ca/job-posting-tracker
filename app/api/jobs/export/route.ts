@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate CSV
-    const headers = ['Date', 'Job Name', 'Company', 'URL', 'Match', 'Notes', 'Summary'];
+    const headers = ['Date', 'Job Name', 'Company', 'URL', 'Match', 'Notes'];
     const rows = jobs.map(job => [
       job.emailDate,
       escapeCSV(job.jobName),
@@ -29,7 +29,6 @@ export async function GET(request: NextRequest) {
       job.jobUrl,
       job.criteriaMatch ? 'Yes' : 'No',
       escapeCSV(job.followupDescription),
-      escapeCSV(job.summary)
     ]);
 
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');

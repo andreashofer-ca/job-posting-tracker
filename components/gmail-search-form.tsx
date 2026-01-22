@@ -4,17 +4,19 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Search, AlertCircle, CheckCircle } from 'lucide-react';
+import { Search, AlertCircle, CheckCircle, Mail, FileText } from 'lucide-react';
 
 interface GmailSearchFormProps {
-  onSearch: (params: {
+  onFetchEmails: (params: {
     dateFrom?: string;
     dateTo?: string;
   }) => void;
+  onParseEmails: () => void;
   isLoading: boolean;
+  unparsedCount?: number;
 }
 
-export function GmailSearchForm({ onSearch, isLoading }: GmailSearchFormProps) {
+export function GmailSearchForm({ onFetchEmails, onParseEmails, isLoading, unparsedCount = 0 }: GmailSearchFormProps) {
   // Get current week dates (Monday to Sunday)
   const getWeekDates = () => {
     const today = new Date();
@@ -40,7 +42,7 @@ export function GmailSearchForm({ onSearch, isLoading }: GmailSearchFormProps) {
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleFetchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setErrorDetails([]);
@@ -52,7 +54,7 @@ export function GmailSearchForm({ onSearch, isLoading }: GmailSearchFormProps) {
       return;
     }
 
-    onSearch({
+    onFetchEmails({
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     });
@@ -102,7 +104,7 @@ export function GmailSearchForm({ onSearch, isLoading }: GmailSearchFormProps) {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-white border rounded-lg p-4">
+      <form onSubmit={handleFetchSubmit} className="bg-white border rounded-lg p-4 space-y-4">
         <div className="flex flex-col md:flex-row gap-4 items-end">
           <div className="flex-1">
             <label className="text-xs font-medium text-muted-foreground block mb-2">From Date</label>
@@ -123,10 +125,25 @@ export function GmailSearchForm({ onSearch, isLoading }: GmailSearchFormProps) {
             />
           </div>
           <Button type="submit" disabled={isLoading} className="h-9 md:mt-0 md:w-auto w-full">
-            <Search className="h-4 w-4 mr-2" />
-            {isLoading ? 'Searching...' : 'Search'}
+            <Mail className="h-4 w-4 mr-2" />
+            {isLoading ? 'Fetching...' : 'Fetch Emails'}
           </Button>
         </div>
+
+        {unparsedCount > 0 && (
+          <div className="pt-2 border-t">
+            <Button 
+              type="button" 
+              onClick={onParseEmails} 
+              disabled={isLoading}
+              variant="secondary"
+              className="w-full"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Parse {unparsedCount} Email{unparsedCount !== 1 ? 's' : ''} into Jobs
+            </Button>
+          </div>
+        )}
       </form>
     </div>
   );

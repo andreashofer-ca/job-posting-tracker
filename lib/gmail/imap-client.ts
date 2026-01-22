@@ -83,11 +83,14 @@ export async function searchGmail(
                   subject: parsed.subject || 'No Subject',
                   date: parsed.date?.toISOString() || new Date().toISOString(),
                   body: parsed.text || parsed.html || '',
-                  html: parsed.html,
+                  html: parsed.html || undefined,
                   from: parsed.from?.text || '',
                 });
 
                 processedCount++;
+                if (!parsed.html && parsed.text) {
+                  console.log('Email has no HTML, only text. Subject:', parsed.subject?.substring(0, 50));
+                }
                 if (processedCount + errorCount === limitedResults.length) {
                   console.log(`Finished processing ${processedCount} emails (${errorCount} errors)`);
                   imap.end();

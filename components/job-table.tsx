@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Job } from '@/lib/data/types';
 import {
   Table,
@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ExternalLink, Trash2 } from 'lucide-react';
+import { ExternalLink, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface JobTableProps {
   jobs: Job[];
@@ -27,12 +27,68 @@ interface JobTableProps {
   onDelete: (id: string) => void;
 }
 
+type SortBy = 'date' | 'jobName' | 'company' | 'match';
+
 export function JobTable({ jobs, onUpdate, onDelete }: JobTableProps) {
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const handleNotesChange = (id: string, notes: string) => {
     onUpdate(id, { followupDescription: notes });
     setEditingNotes(null);
+  };
+
+  const handleSort = (column: SortBy) => {
+    if (sortBy === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to descending
+      setSortBy(column);
+      setSortDirection('desc');
+    }
+  };
+
+  const sortedJobs = useMemo(() => {
+    const sorted = [...jobs].sort((a, b) => {
+      let aValue: any;
+      let bValue: any;
+
+      switch (sortBy) {
+        case 'date':
+          aValue = new Date(a.emailDate).getTime();
+          bValue = new Date(b.emailDate).getTime();
+          break;
+        case 'jobName':
+          aValue = a.jobName.toLowerCase();
+          bValue = b.jobName.toLowerCase();
+          break;
+        case 'company':
+          aValue = a.company.toLowerCase();
+          bValue = b.company.toLowerCase();
+          break;
+        case 'match':
+          aValue = a.criteriaMatch ? 1 : 0;
+          bValue = b.criteriaMatch ? 1 : 0;
+          break;
+      }
+
+      if (sortDirection === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    return sorted;
+  }, [jobs, sortBy, sortDirection]);
+
+  const SortIndicator = ({ column }: { column: SortBy }) => {
+    if (sortBy !== column) return null;
+    return sortDirection === 'asc' ? 
+      <ArrowUp className="h-4 w-4 inline ml-1" /> : 
+      <ArrowDown className="h-4 w-4 inline ml-1" />;
   };
 
   return (
@@ -40,23 +96,31 @@ export function JobTable({ jobs, onUpdate, onDelete }: JobTableProps) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Date</TableHead>
-            <TableHead>Job Name</TableHead>
-            <TableHead>Company</TableHead>
-            <TableHead>Match</TableHead>
+            <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('date')}>
+              Date <SortIndicator column="date" />
+            </TableHead>
+            <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('jobName')}>
+              Job Name <SortIndicator column="jobName" />
+            </TableHead>
+            <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('company')}>
+              Company <SortIndicator column="company" />
+            </TableHead>
+            <TableHead className="cursor-pointer hover:bg-muted" onClick={() => handleSort('match')}>
+              Match <SortIndicator column="match" />
+            </TableHead>
             <TableHead>Followup Notes</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {jobs.length === 0 ? (
+          {sortedJobs.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-muted-foreground">
                 No jobs found. Search Gmail to get started.
               </TableCell>
             </TableRow>
           ) : (
-            jobs.map((job) => (
+            sortedJobs.map((job) => (
               <TableRow key={job.id}>
                 <TableCell className="whitespace-nowrap">
                   {new Date(job.emailDate).toLocaleDateString()}

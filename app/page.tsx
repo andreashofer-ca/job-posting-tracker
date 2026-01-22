@@ -5,7 +5,6 @@ import { Job } from '@/lib/data/types';
 import { JobTable } from '@/components/job-table';
 import { GmailSearchForm } from '@/components/gmail-search-form';
 import { ExportButton } from '@/components/export-button';
-import { JsonImportButton } from '@/components/json-import-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -13,9 +12,11 @@ export default function Home() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [unparsedCount, setUnparsedCount] = useState(0);
 
   useEffect(() => {
     loadJobs();
+    loadUnparsedCount();
   }, []);
 
   const loadJobs = async () => {
@@ -31,14 +32,24 @@ export default function Home() {
     }
   };
 
-  const handleSearch = async (params: {
+  const loadUnparsedCount = async () => {
+    try {
+      const response = await fetch('/api/emails');
+      const data = await response.json();
+      const unparsed = data.emails?.filter((e: any) => !e.parsed) || [];
+      setUnparsedCount(unparsed.length);
+    } catch (error) {
+      console.error('Failed to load email count:', error);
+    }
+  };
+
+  const handleFetchEmails = async (params: {
     dateFrom?: string;
     dateTo?: string;
-    unreadOnly: boolean;
   }) => {
     setIsSearching(true);
     try {
-      const response = await fetch('/api/gmail/search', {
+      const response = await fetch('/api/emails/fetch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -49,25 +60,67 @@ export default function Home() {
         // Show success message
         if (typeof window !== 'undefined' && (window as any).gmailSearchSetSuccess) {
           (window as any).gmailSearchSetSuccess(
-            `Found ${data.jobsFound} jobs from ${data.emailsFound} emails`
+            `Fetched ${data.emailsSaved} emails from Gmail`
           );
         }
-        await loadJobs();
+        await loadUnparsedCount();
       } else {
         // Show error message with details
         if (typeof window !== 'undefined' && (window as any).gmailSearchSetError) {
           (window as any).gmailSearchSetError(
-            data.error || 'Search failed',
+            data.error || 'Fetch failed',
             data.instructions || data.suggestions || (data.details ? [data.details] : [])
           );
         }
-        console.error('Search error:', data);
+        console.error('Fetch error:', data);
       }
     } catch (error) {
-      console.error('Search failed:', error);
+      console.error('Fetch failed:', error);
       if (typeof window !== 'undefined' && (window as any).gmailSearchSetError) {
         (window as any).gmailSearchSetError(
-          'Failed to search Gmail',
+          'Failed to fetch emails',
+          [(error as Error).message || 'Unknown error occurred']
+        );
+      }
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleParseEmails = async () => {
+    setIsSearching(true);
+    try {
+      const response = await fetch('/api/emails/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      
+      if (data.success) {
+        // Show success message
+        if (typeof window !== 'undefined' && (window as any).gmailSearchSetSuccess) {
+          (window as any).gmailSearchSetSuccess(
+            `Parsed ${data.emailsParsed} emails into ${data.jobsCreated} jobs`
+          );
+        }
+        await loadJobs();
+        await loadUnparsedCount();
+      } else {
+        // Show error message
+        if (typeof window !== 'undefined' && (window as any).gmailSearchSetError) {
+          (window as any).gmailSearchSetError(
+            data.error || 'Parse failed',
+            data.details ? [data.details] : []
+          );
+        }
+        console.error('Parse error:', data);
+      }
+    } catch (error) {
+      console.error('Parse failed:', error);
+      if (typeof window !== 'undefined' && (window as any).gmailSearchSetError) {
+        (window as any).gmailSearchSetError(
+          'Failed to parse emails',
           [(error as Error).message || 'Unknown error occurred']
         );
       }
@@ -114,7 +167,12 @@ export default function Home() {
         </p>
       </header>
 
-      <GmailSearchForm onSearch={handleSearch} isLoading={isSearching} />
+      <GmailSearchForm 
+        onFetchEmails={handleFetchEmails} 
+        onParseEmails={handleParseEmails}
+        isLoading={isSearching}
+        unparsedCount={unparsedCount}
+      />
 
       <div className="space-y-4">
         <div className="flex justify-between items-center">
@@ -122,7 +180,7 @@ export default function Home() {
           <div className="flex gap-2">
             <div className="flex gap-2">
               <ExportButton />
-              <JsonImportButton onImportComplete={loadJobs} />
+
             </div>
             <Button 
               onClick={() => {

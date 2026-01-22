@@ -1,3 +1,9 @@
+/**
+ * Jobs Data Store
+ * 
+ * Manages the jobs database (jobs.json) with functions for
+ * storing, retrieving, and updating job records.
+ */
 import { promises as fs } from 'fs';
 import path from 'path';
 import { Job, JobsData } from './types';
