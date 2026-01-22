@@ -21,10 +21,21 @@ export function ExportButton() {
       const url = `/api/jobs/export${filter === 'matched' ? '?filter=matched' : ''}`;
       const response = await fetch(url);
       const blob = await response.blob();
+      
+      // Extract filename from Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'jobs.csv';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+      
       const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = downloadUrl;
-      a.download = `linkedin-jobs-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
