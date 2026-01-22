@@ -31,12 +31,18 @@ type SortBy = 'date' | 'jobName' | 'company' | 'match';
 
 export function JobTable({ jobs, onUpdate, onDelete }: JobTableProps) {
   const [editingNotes, setEditingNotes] = useState<string | null>(null);
+  const [editingCompany, setEditingCompany] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortBy>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const handleNotesChange = (id: string, notes: string) => {
     onUpdate(id, { followupDescription: notes });
     setEditingNotes(null);
+  };
+
+  const handleCompanyChange = (id: string, company: string) => {
+    onUpdate(id, { company });
+    setEditingCompany(null);
   };
 
   const handleSort = (column: SortBy) => {
@@ -126,7 +132,30 @@ export function JobTable({ jobs, onUpdate, onDelete }: JobTableProps) {
                   {new Date(job.emailDate).toLocaleDateString()}
                 </TableCell>
                 <TableCell className="font-medium">{job.jobName}</TableCell>
-                <TableCell>{job.company}</TableCell>
+                <TableCell>
+                  {editingCompany === job.id ? (
+                    <Input
+                      defaultValue={job.company}
+                      onBlur={(e) => handleCompanyChange(job.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleCompanyChange(job.id, e.currentTarget.value);
+                        } else if (e.key === 'Escape') {
+                          setEditingCompany(null);
+                        }
+                      }}
+                      autoFocus
+                      className="max-w-xs"
+                    />
+                  ) : (
+                    <div
+                      onClick={() => setEditingCompany(job.id)}
+                      className="cursor-pointer hover:bg-muted p-2 rounded min-h-[2rem]"
+                    >
+                      {job.company}
+                    </div>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Select
                     value={job.criteriaMatch ? 'yes' : 'no'}
