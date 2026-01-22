@@ -33,7 +33,14 @@ export async function GET(request: NextRequest) {
 
     const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
 
-    const filename = `linkedin-jobs-${new Date().toISOString().split('T')[0]}.csv`;
+    // Calculate date range from jobs
+    let filename = 'jobs.csv';
+    if (jobs.length > 0) {
+      const dates = jobs.map(job => new Date(job.emailDate).getTime());
+      const minDate = new Date(Math.min(...dates)).toISOString().split('T')[0];
+      const maxDate = new Date(Math.max(...dates)).toISOString().split('T')[0];
+      filename = `jobs_${minDate}_to_${maxDate}.csv`;
+    }
 
     return new NextResponse(csv, {
       headers: {
