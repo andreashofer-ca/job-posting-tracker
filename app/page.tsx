@@ -114,70 +114,39 @@ export default function Home() {
         </p>
       </header>
 
-      <div className="grid md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Total Jobs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{jobs.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">Matched</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{matchedCount}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium">To Review</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{jobs.length - matchedCount}</div>
-          </CardContent>
-        </Card>
-      </div>
+      <GmailSearchForm onSearch={handleSearch} isLoading={isSearching} />
 
-      <div className="grid md:grid-cols-3 gap-8">
-        <div>
-          <GmailSearchForm onSearch={handleSearch} isLoading={isSearching} />
-        </div>
-
-        <div className="md:col-span-2 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-semibold">Your Jobs</h2>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-2xl font-semibold">Your Jobs <span className="text-base font-normal text-muted-foreground ml-2">({jobs.length} Total, {matchedCount} Matched, {jobs.length - matchedCount} To Review)</span></h2>
+          <div className="flex gap-2">
             <div className="flex gap-2">
-              <div className="flex gap-2">
-                <ExportButton />
-                <JsonImportButton onImportComplete={loadJobs} />
-              </div>
-              <Button 
-                onClick={() => {
-                  if (confirm('Are you sure you want to clear all jobs? This cannot be undone.')) {
-                    setJobs([]);
-                    // Write empty jobs array to file
-                    fetch('/api/jobs', { 
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ jobs: [] })
-                    }).catch(err => console.error('Error clearing jobs:', err));
-                  }
-                }}
-              >
-                Clear All
-              </Button>
+              <ExportButton />
+              <JsonImportButton onImportComplete={loadJobs} />
             </div>
+            <Button 
+              onClick={() => {
+                if (confirm('Are you sure you want to clear all jobs? This cannot be undone.')) {
+                  setJobs([]);
+                  // Write empty jobs array to file
+                  fetch('/api/jobs', { 
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ jobs: [] })
+                  }).catch(err => console.error('Error clearing jobs:', err));
+                }
+              }}
+            >
+              Clear All
+            </Button>
           </div>
-
-          {isLoading ? (
-            <p className="text-center py-8 text-muted-foreground">Loading jobs...</p>
-          ) : (
-            <JobTable jobs={jobs} onUpdate={handleUpdate} onDelete={handleDelete} />
-          )}
         </div>
+
+        {isLoading ? (
+          <p className="text-center py-8 text-muted-foreground">Loading jobs...</p>
+        ) : (
+          <JobTable jobs={jobs} onUpdate={handleUpdate} onDelete={handleDelete} />
+        )}
       </div>
 
       <footer className="text-center text-sm text-muted-foreground pt-8">

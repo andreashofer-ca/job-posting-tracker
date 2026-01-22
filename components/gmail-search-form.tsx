@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Search, AlertCircle, CheckCircle } from 'lucide-react';
 
@@ -11,15 +10,32 @@ interface GmailSearchFormProps {
   onSearch: (params: {
     dateFrom?: string;
     dateTo?: string;
-    unreadOnly: boolean;
   }) => void;
   isLoading: boolean;
 }
 
 export function GmailSearchForm({ onSearch, isLoading }: GmailSearchFormProps) {
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [unreadOnly, setUnreadOnly] = useState(false);
+  // Get current week dates (Monday to Sunday)
+  const getWeekDates = () => {
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const diffToMonday = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust when day is Sunday
+    
+    const monday = new Date(today.setDate(diffToMonday));
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+    
+    const formatDate = (date: Date) => date.toISOString().split('T')[0];
+    
+    return {
+      from: formatDate(monday),
+      to: formatDate(sunday)
+    };
+  };
+
+  const weekDates = getWeekDates();
+  const [dateFrom, setDateFrom] = useState(weekDates.from);
+  const [dateTo, setDateTo] = useState(weekDates.to);
   const [error, setError] = useState<string | null>(null);
   const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -39,7 +55,6 @@ export function GmailSearchForm({ onSearch, isLoading }: GmailSearchFormProps) {
     onSearch({
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
-      unreadOnly,
     });
   };
 
@@ -57,80 +72,62 @@ export function GmailSearchForm({ onSearch, isLoading }: GmailSearchFormProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Search Gmail for LinkedIn Jobs</CardTitle>
-        <p className="text-sm text-muted-foreground mt-2">
-          Note: Requires Gmail credentials configured in .env.local. See SIMPLE_GMAIL_SETUP.md
-        </p>
-      </CardHeader>
-      <CardContent>
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex gap-2">
-              <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-semibold text-red-900">{error}</h3>
-                {errorDetails.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-sm text-red-800">
-                    {errorDetails.map((detail, i) => (
-                      <li key={i}>• {detail}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+    <div className="space-y-3">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex gap-2">
+            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-red-900">{error}</h3>
+              {errorDetails.length > 0 && (
+                <ul className="mt-2 space-y-1 text-sm text-red-800">
+                  {errorDetails.map((detail, i) => (
+                    <li key={i}>• {detail}</li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {successMessage && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex gap-2">
-              <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-green-900">{successMessage}</h3>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+      {successMessage && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex gap-2">
+            <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
             <div>
-              <label className="text-sm font-medium mb-2 block">From Date</label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium mb-2 block">To Date</label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
+              <h3 className="font-semibold text-green-900">{successMessage}</h3>
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="unread"
-              checked={unreadOnly}
-              onCheckedChange={(checked) => setUnreadOnly(checked as boolean)}
+      <form onSubmit={handleSubmit} className="bg-white border rounded-lg p-4">
+        <div className="flex flex-col md:flex-row gap-4 items-end">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-muted-foreground block mb-2">From Date</label>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-9"
             />
-            <label htmlFor="unread" className="text-sm font-medium cursor-pointer">
-              Unread only
-            </label>
           </div>
-
-          <Button type="submit" disabled={isLoading} className="w-full">
+          <div className="flex-1">
+            <label className="text-xs font-medium text-muted-foreground block mb-2">To Date</label>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-9"
+            />
+          </div>
+          <Button type="submit" disabled={isLoading} className="h-9 md:mt-0 md:w-auto w-full">
             <Search className="h-4 w-4 mr-2" />
-            {isLoading ? 'Searching...' : 'Search Gmail'}
+            {isLoading ? 'Searching...' : 'Search'}
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </form>
+    </div>
   );
 }
