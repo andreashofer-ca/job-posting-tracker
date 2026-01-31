@@ -71,9 +71,11 @@ export async function POST(request: NextRequest) {
           messages: [
             {
               role: 'user',
-              content: `Extract the job title and company name from this LinkedIn job alert email. Return ONLY valid JSON with no other text.
+              content: `Extract all job titles and company names from this LinkedIn job alert email. The email may contain multiple job listings. Return ONLY valid JSON with no other text.
 
-Format: {"jobTitle": "exact job title", "company": "exact company name"}
+Format: [{"jobTitle": "exact job title", "company": "exact company name"}, ...]
+
+If there's only one job, still return an array with one object.
 
 Email:
 ${emailContent}`,
@@ -82,38 +84,116 @@ ${emailContent}`,
         });
 
         const content = message.content[0];
-        let jobTitle = '';
-        let company = '';
+        const jobsData: Array<{ jobTitle: string; company: string }> = [];
 
         if (content.type === 'text') {
-          const jsonMatch = content.text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
+          const responseText = content.text.trim();
+          console.log('Claude response:', responseText);
+
+          // First, try to parse as a JSON array
+          const arrayMatch = responseText.match(/\[[\s\S]*\]/);
+          if (arrayMatch) {
             try {
-              const parsed = JSON.parse(jsonMatch[0]);
-              jobTitle = parsed.jobTitle || '';
-              company = parsed.company || '';
+              const parsed = JSON.parse(arrayMatch[0]);
+              if (Array.isArray(parsed)) {
+                jobsData.push(...parsed);
+                console.log(`Successfully parsed ${parsed.length} jobs from array format`);
+              }
             } catch (e) {
-              console.log('Failed to parse Claude response:', jsonMatch[0]);
+              console.log('Failed to parse as JSON array, trying individual objects...');
             }
+          }
+
+          // If array parsing didn't work, try parsing individual JSON objects
+          if (jobsData.length === 0) {
+            // Split by newlines and try to find complete JSON objects
+            // Handle cases where Claude returns multiple objects on separate lines
+            const lines = responseText.split('\n');
+            let currentObj = '';
+            let braceCount = 0;
+
+            for (const line of lines) {
+              const trimmedLine = line.trim();
+              if (!trimmedLine) continue;
+
+              currentObj += trimmedLine;
+              
+              // Count braces to detect complete objects
+              for (const char of trimmedLine) {
+                if (char === '{') braceCount++;
+                if (char === '}') braceCount--;
+              }
+
+              // When braces are balanced, try to parse the accumulated object
+              if (braceCount === 0 && currentObj.includes('{')) {
+                try {
+                  const parsed = JSON.parse(currentObj);
+                  if (parsed.jobTitle && parsed.company) {
+                    jobsData.push(parsed);
+                    console.log(`Parsed job: ${parsed.jobTitle} at ${parsed.company}`);
+                  }
+                  currentObj = '';
+                } catch (err) {
+                  // Not a valid JSON object yet, continue accumulating
+                  currentObj = '';
+                }
+              }
+            }
+
+            // Final fallback: try original regex approach for any remaining content
+            if (jobsData.length === 0) {
+              const objectMatches = responseText.match(/\{[^{}]*"jobTitle"[^{}]*"company"[^{}]*\}/g);
+              if (objectMatches) {
+                console.log(`Found ${objectMatches.length} individual job objects via regex`);
+                for (const objStr of objectMatches) {
+                  try {
+                    const parsed = JSON.parse(objStr);
+                    if (parsed.jobTitle || parsed.company) {
+                      jobsData.push(parsed);
+                    }
+                  } catch (err) {
+                    console.log('Failed to parse individual object:', objStr);
+                  }
+                }
+              }
+            }
+          }
+
+          if (jobsData.length > 0) {
+            console.log(`Total jobs extracted: ${jobsData.length}`);
+          } else {
+            console.log('Failed to parse Claude response:', responseText);
           }
         }
 
-        // Create job with simplified fields
-        const job = await addJob({
-          emailDate: email.date,
-          jobName: jobTitle || extractJobTitleFromSubject(email.subject),
-          company: company || 'Unknown Company',
-          jobUrl: jobUrl,
-          criteriaMatch: false, // User will fill this
-          followupDescription: '', // User will fill this
-        });
+        // If no jobs found via Claude, create one with fallback extraction
+        if (jobsData.length === 0) {
+          console.log(`No jobs parsed from email ${email.id}, using fallback extraction`);
+          jobsData.push({
+            jobTitle: extractJobTitleFromSubject(email.subject),
+            company: 'Unknown Company'
+          });
+        }
 
-        createdJobs.push(job);
+        // Create a job for each extracted job listing
+        console.log(`Creating ${jobsData.length} job(s) from email ${email.id}`);
+        for (const jobData of jobsData) {
+          const job = await addJob({
+            emailDate: email.date,
+            jobName: jobData.jobTitle || extractJobTitleFromSubject(email.subject),
+            company: jobData.company || 'Unknown Company',
+            jobUrl: jobUrl,
+            criteriaMatch: false, // User will fill this
+            followupDescription: '', // User will fill this
+          });
+
+          createdJobs.push(job);
+          console.log(`  ✓ Created job ${job.id}: "${jobData.jobTitle}" at ${jobData.company}`);
+        }
 
         // Mark email as parsed
         await markEmailAsParsed(email.id);
-
-        console.log(`Parsed email ${email.id} into job ${job.id}`);
+        console.log(`Email ${email.id} marked as parsed`);
       } catch (error) {
         console.error(`Error parsing email ${email.id}:`, error);
         // Continue with next email
