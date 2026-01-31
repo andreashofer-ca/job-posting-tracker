@@ -59,8 +59,9 @@ export async function POST(request: NextRequest) {
       if (!email) continue;
 
       try {
-        // Extract job URL from HTML or text body
-        const jobUrl = extractJobUrl(email.htmlBody || email.textBody);
+        // Extract job URLs from text body (more reliable structure with "View job:" pattern)
+        const jobUrls = extractAllJobUrls(email.textBody);
+        console.log(`Found ${jobUrls.length} job URLs in email:`, jobUrls);
 
         // Use Claude to extract job details
         const emailContent = `Subject: ${email.subject}\n\n${email.textBody.substring(0, 3000)}`;
@@ -177,7 +178,11 @@ ${emailContent}`,
 
         // Create a job for each extracted job listing
         console.log(`Creating ${jobsData.length} job(s) from email ${email.id}`);
-        for (const jobData of jobsData) {
+        for (let i = 0; i < jobsData.length; i++) {
+          const jobData = jobsData[i];
+          // Use URL by index - each job gets its corresponding URL
+          const jobUrl = jobUrls[i] || jobUrls[0] || '';
+          
           const job = await addJob({
             emailDate: email.date,
             jobName: jobData.jobTitle || extractJobTitleFromSubject(email.subject),
@@ -188,7 +193,7 @@ ${emailContent}`,
           });
 
           createdJobs.push(job);
-          console.log(`  ✓ Created job ${job.id}: "${jobData.jobTitle}" at ${jobData.company}`);
+          console.log(`  ✓ Created job ${job.id}: "${jobData.jobTitle}" at ${jobData.company} - URL: ${jobUrl}`);
         }
 
         // Mark email as parsed
@@ -219,31 +224,54 @@ ${emailContent}`,
   }
 }
 
-function extractJobUrl(content: string): string {
-  if (!content) return '';
+function extractAllJobUrls(textBody: string): string[] {
+  if (!textBody) return [];
 
-  // Decode HTML entities
-  const decoded = content
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
-
-  // Look for LinkedIn job URLs
-  const urlPattern = /https:\/\/[^\s"'<>]+linkedin\.com[^\s"'<>]*\/jobs\/view\/\d+[^\s"'<>]*/gi;
-  const matches = decoded.match(urlPattern);
-
-  if (matches && matches.length > 0) {
-    // Clean the URL
-    const url = matches[0];
-    const cleanMatch = url.match(/(https:\/\/[^\/\s]+(?:\/comm)?\/jobs\/view\/\d+)/i);
-    if (cleanMatch) {
-      return cleanMatch[1] + '/';
+  // In LinkedIn job alert emails, the structure is:
+  // 1. Header with a "reference" job URL (the job you viewed that triggered the alert)
+  // 2. Multiple job listings, each with "View job: <url>" pattern
+  // 
+  // We only want URLs from "View job:" links, not the header reference URL
+  
+  const urls: string[] = [];
+  const seenJobIds = new Set<string>();
+  
+  // Match URLs that appear after "View job:" text pattern
+  // This ensures we only get actual job listing URLs, not the reference job in header
+  const viewJobPattern = /View job:\s*https:\/\/[^\s]+linkedin\.com[^\s]*\/jobs\/view\/(\d+)/gi;
+  const matches = [...textBody.matchAll(viewJobPattern)];
+  
+  for (const match of matches) {
+    const jobId = match[1];
+    if (!seenJobIds.has(jobId)) {
+      seenJobIds.add(jobId);
+      urls.push(`https://www.linkedin.com/jobs/view/${jobId}/`);
     }
-    return url.split(/[?#]/)[0]; // Remove query params
   }
-
-  return '';
+  
+  // Fallback: if no "View job:" URLs found, try extracting all unique job URLs
+  // but skip the first one (likely the reference job in header)
+  if (urls.length === 0) {
+    const allUrlPattern = /https:\/\/[^\s"'<>]+linkedin\.com[^\s"'<>]*\/jobs\/view\/(\d+)/gi;
+    const allMatches = [...textBody.matchAll(allUrlPattern)];
+    
+    let isFirst = true;
+    for (const match of allMatches) {
+      const jobId = match[1];
+      // Skip the first unique URL (reference job in header)
+      if (!seenJobIds.has(jobId)) {
+        if (isFirst) {
+          isFirst = false;
+          seenJobIds.add(jobId); // Mark as seen but don't add to urls
+          continue;
+        }
+        seenJobIds.add(jobId);
+        urls.push(`https://www.linkedin.com/jobs/view/${jobId}/`);
+      }
+    }
+  }
+  
+  return urls;
 }
 
 function extractJobTitleFromSubject(subject: string): string {
