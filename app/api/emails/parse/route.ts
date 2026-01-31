@@ -72,11 +72,15 @@ export async function POST(request: NextRequest) {
           messages: [
             {
               role: 'user',
-              content: `Extract all job titles and company names from this LinkedIn job alert email. The email may contain multiple job listings. Return ONLY valid JSON with no other text.
+              content: `Extract job titles and company names from this LinkedIn job alert email. 
+
+IMPORTANT: Only extract jobs that appear AFTER the phrase "View job:" in the email body. The email header often mentions a "reference job" (like "Jobs similar to X at Y") - do NOT include this reference job. Only include the actual job LISTINGS that have "View job:" links.
+
+Return ONLY valid JSON with no other text.
 
 Format: [{"jobTitle": "exact job title", "company": "exact company name"}, ...]
 
-If there's only one job, still return an array with one object.
+If there's only one job listing, still return an array with one object.
 
 Email:
 ${emailContent}`,
